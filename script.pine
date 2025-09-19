@@ -1,0 +1,63 @@
+//@version=6
+strategy("ATR Trail Stop (3 ATR from High/Low)",
+     overlay=true, 
+     margin_long=100, margin_short=100, 
+     process_orders_on_close=true)
+
+// === Inputs ===
+atrLength = input.int(14, "ATR Length")
+atrMult   = input.float(3.0, "ATR Multiple")
+enableLong = input.bool(true, "Enable Longs")
+enableShort = input.bool(true, "Enable Shorts")
+
+// === ATR calculation ===
+atrValue = ta.atr(atrLength)
+
+// === Example Entry Conditions (replace with your own if you'd like) ===
+longCond  = ta.crossover(ta.sma(close,10), ta.sma(close,30))
+shortCond = ta.crossunder(ta.sma(close,10), ta.sma(close,30))
+
+if (enableLong and longCond)
+    strategy.entry("MyLong", strategy.long)
+
+if (enableShort and shortCond)
+    strategy.entry("MyShort", strategy.short)
+
+// === Track Highest Close for Longs / Lowest Close for Shorts ===
+var float highestClose = na
+var float lowestClose  = na
+
+if strategy.position_size > 0
+    // Long position open → update highest close
+    highestClose := na(highestClose) ? close : math.max(highestClose, close)
+    lowestClose := na
+else if strategy.position_size < 0
+    // Short position open → update lowest close
+    lowestClose := na(lowestClose) ? close : math.min(lowestClose, close)
+    highestClose := na
+else
+    // No position → reset
+    highestClose := na
+    lowestClose  := na
+
+// === Dynamic Trailing Levels ===
+longTrigger  = highestClose - (atrMult * atrValue)
+shortTrigger = lowestClose  + (atrMult * atrValue)
+
+// === Exit Conditions ===
+exitLongCond  = (strategy.position_size > 0) and (close <= longTrigger)
+exitShortCond = (strategy.position_size < 0) and (close >= shortTrigger)
+
+if exitLongCond
+    strategy.close("MyLong")
+    alert("⚠️ Long dropped 3 ATRs from highest close!", alert.freq_once_per_bar)
+
+if exitShortCond
+    strategy.close("MyShort")
+    alert("⚠️ Short bounced 3 ATRs from lowest close!", alert.freq_once_per_bar)
+
+// === Plotting ===
+plot(highestClose, "Highest Close (Long Tracking)", color=color.new(color.green, 0))
+plot(lowestClose,  "Lowest Close (Short Tracking)", color=color.new(color.purple, 0))
+plot(longTrigger,  "3 ATR Below High for Longs", color=color.red)
+plot(shortTrigger, "3 ATR Above Low for Shorts", color=color.blue)
