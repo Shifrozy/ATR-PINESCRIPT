@@ -13,7 +13,7 @@ enableShort  = input.bool(true, "Enable Shorts")
 // === ATR calculation ===
 atrValue = ta.atr(atrLength)
 
-// === Example Entry Conditions (can replace with your own rules) ===
+// === Example Entry Conditions (replace with your own logic) ===
 longCond  = ta.crossover(ta.sma(close,10), ta.sma(close,30))
 shortCond = ta.crossunder(ta.sma(close,10), ta.sma(close,30))
 
@@ -28,15 +28,15 @@ var float highestClose = na
 var float lowestClose  = na
 
 if strategy.position_size > 0
-    // Long position → track max closing price
+    // Track long highs
     highestClose := na(highestClose) ? close : math.max(highestClose, close)
     lowestClose := na
 else if strategy.position_size < 0
-    // Short position → track min closing price
+    // Track short lows
     lowestClose := na(lowestClose) ? close : math.min(lowestClose, close)
     highestClose := na
 else
-    // Flat → reset
+    // Reset if flat
     highestClose := na
     lowestClose  := na
 
@@ -50,18 +50,22 @@ exitShortCond = (strategy.position_size < 0) and (close >= shortTrigger)
 
 if exitLongCond
     strategy.close("MyLong")
+    // Exit marker on chart
+    label.new(bar_index, close, text="Exit Long", 
+              style=label.style_label_down, color=color.red, textcolor=color.white)
 
 if exitShortCond
     strategy.close("MyShort")
+    // Exit marker on chart
+    label.new(bar_index, close, text="Exit Short", 
+              style=label.style_label_up, color=color.green, textcolor=color.white)
 
 // === Alerts ===
-// These show up in the TradingView alert dialog so user can pick them directly
 alertcondition(exitLongCond, title="Exit Long (ATR Trail)", 
      message="⚠️ Long exited: price dropped 3 ATRs from highest close.")
 alertcondition(exitShortCond, title="Exit Short (ATR Trail)", 
      message="⚠️ Short exited: price rose 3 ATRs from lowest close.")
 
-// Optional inline alerts if you also want "Any alert() function call"
 if exitLongCond
     alert("⚠️ Long exited: price dropped 3 ATRs from highest close.", alert.freq_once_per_bar)
 
