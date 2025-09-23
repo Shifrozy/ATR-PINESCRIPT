@@ -1,0 +1,57 @@
+//@version=6
+indicator("ATR Exit Indicator (3 ATR Trailing Stop)", overlay=true)
+
+// === Inputs ===
+atrLength   = input.int(14, "ATR Length")
+atrMult     = input.float(3.0, "ATR Multiple")
+lookback    = input.int(200, "Lookback Bars for High/Low")   // how far back to track
+trackLongs  = input.bool(true, "Track Long Exits")
+trackShorts = input.bool(true, "Track Short Exits")
+
+// === ATR ===
+atrValue = ta.atr(atrLength)
+
+// === Running Highs / Lows (always update so lines are visible) ===
+highestClose = trackLongs  ? ta.highest(close, lookback) : na
+lowestClose  = trackShorts ? ta.lowest(close, lookback)  : na
+
+// === Trailing Stops ===
+longTrigger  = trackLongs  and not na(highestClose) ? (highestClose - atrMult * atrValue) : na
+shortTrigger = trackShorts and not na(lowestClose)  ? (lowestClose + atrMult * atrValue) : na
+
+// === One-time state variables for exit signals ===
+var bool longExited  = false
+var bool shortExited = false
+
+// Reset state at the first bar
+if barstate.isfirst
+    longExited  := false
+    shortExited := false
+
+// === Exit Conditions (trigger once only) ===
+exitLongCond  = not longExited  and trackLongs  and not na(longTrigger)  and close <= longTrigger
+exitShortCond = not shortExited and trackShorts and not na(shortTrigger) and close >= shortTrigger
+
+if exitLongCond
+    longExited := true
+    label.new(bar_index, close, text="Exit Long", 
+              style=label.style_label_down, color=color.red, textcolor=color.white)
+    alert("⚠️ Exit Long: Price dropped 3 ATRs below tracked high.", alert.freq_once_per_bar)
+
+if exitShortCond
+    shortExited := true
+    label.new(bar_index, close, text="Exit Short", 
+              style=label.style_label_up, color=color.green, textcolor=color.white)
+    alert("⚠️ Exit Short: Price rose 3 ATRs above tracked low.", alert.freq_once_per_bar)
+
+// === Alerts Setup ===
+alertcondition(exitLongCond, title="Exit Long (ATR Trail)", 
+     message="⚠️ Exit Long: Price dropped 3 ATRs below tracked high.")
+alertcondition(exitShortCond, title="Exit Short (ATR Trail)", 
+     message="⚠️ Exit Short: Price rose 3 ATRs above tracked low.")
+
+// === Always Plot Lines ===
+plot(highestClose, "Highest Close (Lookback)", color=color.new(color.green, 0))
+plot(lowestClose,  "Lowest Close (Lookback)",  color=color.new(color.purple, 0))
+plot(longTrigger,  "3 ATR Stop (Long)", color=color.red)
+plot(shortTrigger, "3 ATR Stop (Short)", color=color.blue)
